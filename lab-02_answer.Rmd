@@ -33,9 +33,6 @@ Add your solutions to the `lab-02_answer.Rmd` file as you work through the exerc
 Obtain a copy of both the question and answer files using Git.
 To clone a copy of this repository to your own PC, use the following command:
 
-```{bash, eval = FALSE}
-git clone https://github.com/tisem-digital-marketing/smwa-lab-02.git
-```
 
 Once you have your copy, open the answer document in RStudio as an RStudio project and work through the questions.
 
@@ -86,6 +83,8 @@ library(modelsummary)
 
 ```{r}
 # Write your answer here
+df <- read_dta("data/sasp_panel.dta")
+
 ```
 
 
@@ -97,7 +96,9 @@ library(modelsummary)
 Write a short command to drop any rows which have missing values from the data.
 
 ```{r}
-# Write your answer here
+df_no_na <- na.omit(df)
+glimpse(df_no_na)
+
 ```
 
 
@@ -109,7 +110,18 @@ Your plot should therefore have two histograms, potentially overlaying each othe
 Does there appear to be a difference in price between safe and unsafe sex?
 
 ```{r}
-# Write your answer here
+library(ggplot2)
+library(viridis)
+
+glimpse(df_no_na)
+df_no_na$unsafe <- as.factor(df_no_na$unsafe)
+
+df_no_na %>%
+    ggplot() + 
+    geom_histogram(aes(x=lnw, fill = unsafe), alpha = 0.5, binwidth = 0.1) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_bw()
+
 ```
 
 4. Let's formalize this idea with a regression.
@@ -117,19 +129,27 @@ Run a single variable regression of log hourly wage, `lnw` on the variable `unsa
 Report the results.
 
 ```{r}
-# Write your answer here
+model_simple <- lm(lnw ~ unsafe,
+                   data = df
+                   )
+
+summary(model_simple)
+
+
 ```
 
 
 5. Interpret the coefficient on `unsafe`.
 Is it statistically significant?
 
-Write your answer here
+Write your answer here: 
+The coefficient on unsafe is -0.02551, which indicates that a one-unit increase in the unsafe variable is associated with a decrease of 0.02551 units in the lnw variable, holding all other variables constant.
 
 6. A single variable regression most likely suffers from omitted variable bias. 
 Explain what omitted variable bias is, and why it might impact your regression estimates.
 
-Write your answer here
+Write your answer here:
+In a single variable regression, we estimate the relationship between a single independent variable and a dependent variable. However, there may be other variables that are related to the dependent variable but are not included in the model. If these variables are correlated with the independent variable, they can influence the relationship between the independent variable and the dependent variable, leading to omitted variable bias.
 
 
 7. Add the log of the length of the session, `llength`, as a second variable to your regression.
@@ -137,33 +157,60 @@ Report the results.
 Did the coefficient on `unsafe` change?
 
 ```{r}
-# Write your answer here
+model_simple_llength_incl <- lm(lnw ~ unsafe + llength,
+                   data = df
+                   )
+
+summary(model_simple_llength_incl)
+
 ```
 
 
 8. Explain why ignoring `llength` in your regression led to the coefficient on `unsafe` to be different in sign in the single variable regression than in the two variable regression.
 
-Write your answer here
+Ignoring llength in the single variable regression may have led to omitted variable bias, which occurs when a relevant variable is excluded from the regression model. In this case, llength is a relevant variable that affects both the dependent variable lnw and the independent variable unsafe. When llength is not included in the model, its effect is absorbed by the intercept term, leading to a biased estimate of the coefficient on unsafe.
+
+In the two variable regression, llength is included in the model, allowing for a more accurate estimate of the coefficient on unsafe. By controlling for the effect of llength, the estimated effect of unsafe on lnw is adjusted for the influence of llength, which may be a confounding variable. As a result, the coefficient on unsafe in the two variable regression is different in sign and magnitude compared to the single variable regression.
 
 9.  Add a third variable to the regression, whether the client is a regular or not (`reg` in the data).
 Report your results and comment on any change in the regression estimate of `unsafe`.
 
 ```{r}
-# Write your answer here
+df_no_na$reg <- as.factor(df_no_na$reg)
+
+model_simple_3_var <- lm(lnw ~ unsafe + llength + reg,
+                   data = df
+                   )
+
+summary(model_simple_3_var)
+
 ```
+Compared to the two variable regression, the estimate of unsafe in the three variable regression has decreased slightly in magnitude and become statistically insignificant. This may be due to the fact that llength and reg are both correlated with unsafe, and by including them in the model, their effects on lnw are accounted for, reducing the impact of unsafe. It is also possible that unsafe is not a significant predictor of lnw in the presence of llength and reg, and its apparent association with lnw in the single and two variable regressions was due to omitted variable bias.
+
 
 
 10. When discussing your interim results with a friend who is a bit of a statistical whiz they make the following remark: "I think you're not getting the expected results due to unobserved heterogeneity. Try adding fixed effects for each provider."
 What is unobserved heterogeneity? Why might it matter?
 
-Write your answer here
+Unobserved heterogeneity refers to the existence of unmeasured or unobserved factors that are correlated with both the dependent and independent variables in a regression analysis. These unobserved factors can have a significant impact on the regression results, leading to biased and inconsistent estimates.
+
+Unobserved heterogeneity matters because it violates the assumption of independence between the error term and the independent variables in a regression analysis. This can lead to omitted variable bias, which occurs when the impact of the unobserved variable is captured by the error term, leading to biased estimates of the coefficients of the observed variables.
+
+Adding fixed effects for each provider can help to control for unobserved heterogeneity by including dummy variables for each provider in the regression analysis. This allows for the identification of the provider-specific effects on the outcome variable, while controlling for the impact of unobserved heterogeneity.
 
 11. The data has a unique identifier for each provider in the `id` column.
 Use the `feols()` command from the `fixest` package to re-estimate your regression in (9) adding the provider ID fixed effects.
 Report your results with 'normal' standard errors (i.e. no clustering).
 
 ```{r}
-# Write your answer here
+
+# Estimate regression with fixed effects
+fe_reg <- feols(lnw ~ unsafe + llength + reg | id, data = df_no_na)
+
+# Print summary of results
+summary(fe_reg)
+
+
 ```
 
 
@@ -171,7 +218,8 @@ Report your results with 'normal' standard errors (i.e. no clustering).
 Is the coefficient on `unsafe` now statistically significant?
 Is the coefficient large from a 'marketing' viewpoint?
 
-Write your answer here
+Write your answer here: 
+In the model with fixed effects, the coefficient on unsafe is now 0.0477 with a standard error of 0.0257 and a p-value of 0.0639. This indicates that the effect of unsafe conditions on log wages is still positive, but it is not statistically significant at the conventional level of 0.05.
 
 Your next concern should be the standard errors - and whether we have 'correctly' adjusted for heteroskedasticity and/or clustering.
 
@@ -184,6 +232,15 @@ Does there appear to be evidence of heteroskedasticity?
 
 ```{r}
 # Write your answer here
+df_no_na <- 
+  df_no_na %>%
+  mutate(resid = resid(fe_reg),
+         predict = predict(fe_reg))
+df_no_na %>%
+  ggplot() +
+  geom_point(aes(y = resid, x = predict))
+
+
 ```
 
 
@@ -193,7 +250,10 @@ Does the standard error on `unsafe` change by much?
 Is this consistent with what you found graphically above?
 
 ```{r}
-# Write your answer here
+
+
+
+
 ```
 
 
@@ -202,7 +262,7 @@ Again, you might be able to do this **without** re-estimating the regression mod
 Why might you want to cluster the standard errors this way?
 
 ```{r}
-# Write your answer here
+
 ```
 
 
@@ -213,17 +273,28 @@ Do this by modifying your regression command from (11).
 Report your results and discuss your findings.
 
 ```{r}
-# Write your answer here
+# Estimate regression with fixed effects
+fe_reg_2 <- feols(lnw ~ unsafe + reg | id, data = df_no_na)
+
+# Print summary of results
+summary(fe_reg_2)
+
+
 ```
 
 
 17. Interpret the results you found in (16).
 
-Write your answer here
+Write your answer here:
+In the new regression with provider fixed effects, the coefficient on unsafe is -0.013083 with a standard error of 0.037627. The p-value associated with this coefficient is 0.7282307, indicating that it is not statistically significant at conventional levels. This means that we do not have sufficient evidence to conclude that there is a relationship between the unsafe variable and the outcome variable lnw after controlling for provider fixed effects.
+
+The coefficient on reg1 is -0.068668 with a standard error of 0.023321, and a p-value of 0.0033999. This indicates that the reg1 variable is statistically significant at conventional levels, and suggests that there is a negative relationship between reg1 and lnw after controlling for provider fixed effects. The coefficient on llength remains statistically significant and negative, indicating that there is a negative relationship between llength and lnw even after controlling for provider fixed effects.
 
 18. Are the effects you documented *causal*, *descriptive* or *predictive*?  Explain your answer.
+The effects documented in the analysis are descriptive. The regression analysis aims to describe the relationship between the dependent variable (log wage) and independent variables (unsafe working conditions, length of the job, and whether the job is in a union).
 
-Write your answer here
+While the analysis can suggest potential causal relationships between the variables, it cannot prove causality. To establish causality, one would need to conduct a randomized controlled experiment or use advanced statistical techniques such as instrumental variables or natural experiments.
+
 
 Now that you have run a series of regressions, you want to present the results in a way that you could use in a report or a presentation.
 
@@ -233,6 +304,20 @@ The final result should look similar to a regression table you see in academic p
 
 ```{r}
 # Write your answer here
+# Regression Table
+model_list <- 
+    list(model_simple, 
+         model_simple_llength_incl, 
+         model_simple_3_var,
+         fe_reg)
+names(model_list) <- c("Model 1", "Model 2", "Model 3", "Model 4")
+
+modelsummary(model_list)
+
+modelsummary(model_list,
+             fmt = 2,
+             gof_omit = "AIC|BIC|Log|F|RMSE")
+
 ```
 
 20. Take your regression estimates and produce a coefficient plot to summarize four of them in one place. 
